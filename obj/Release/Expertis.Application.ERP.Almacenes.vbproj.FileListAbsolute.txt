@@ -1,0 +1,24 @@
+C:\Builds\2\Producto\Expertis50R2_Release\bin\Release\Expertis.Application.ERP.Almacenes.dll
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\ResolveAssemblyReference.cache
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.CIActAlmacenPredet.resources
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.CIDisponibilidad.resources
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmDisponible.resources
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmMntoUbicaciones.resources
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmNuevosDatos.resources
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.MntoAlmacenes.resources
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.vbproj.GenerateResource.Cache
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll.licenses
+C:\Builds\2\Producto\Expertis50R2_Release\src\Main\Source\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll
+C:\ExpertisNet50R2test\Bin\Expertis.Application.ERP.Almacenes.dll
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\ResolveAssemblyReference.cache
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.CIActAlmacenPredet.resources
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.CIDisponibilidad.resources
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmDisponible.resources
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmMntoUbicaciones.resources
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmNuevosDatos.resources
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.MntoAlmacenes.resources
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.vbproj.GenerateResource.Cache
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll.licenses
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll
+C:\ExpertisNet50R2test\Bin\Expertis.Application.ERP.Almacenes.pdb
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.pdb
