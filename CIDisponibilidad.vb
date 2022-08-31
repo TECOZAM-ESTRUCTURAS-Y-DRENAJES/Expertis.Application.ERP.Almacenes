@@ -459,6 +459,9 @@ Public Class CIDisponibilidad
             e.Filter.Add("IDFamilia", FilterOperator.Equal, Me.AdvFamiliaArticulo.Value)
             e.Filter.Add("IDSubfamilia", FilterOperator.Equal, Me.AdvSubFamiliaArticulo.Value)
             e.Filter.Add("IDAlmacen", FilterOperator.Equal, Me.AdvAlmacen.Value)
+
+            ''David V 31/08/22
+            e.Filter.Add("IDEstado", FilterOperator.NotEqual, "OBS")
         Catch ex As Exception
             e.Cancel = True
             MessageBox.Show(ex.Message)
