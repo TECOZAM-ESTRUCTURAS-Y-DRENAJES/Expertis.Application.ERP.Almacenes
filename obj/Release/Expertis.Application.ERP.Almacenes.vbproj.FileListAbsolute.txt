@@ -22,3 +22,4 @@ C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Ex
 C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll
 C:\ExpertisNet50R2test\Bin\Expertis.Application.ERP.Almacenes.pdb
 C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.pdb
+C:\Users\lgonzalez\Desktop\EXPERTIS\DESARROLLO EXPERTIS\FR2Sergio\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.MntoAlmacenesExpertis4.resources
