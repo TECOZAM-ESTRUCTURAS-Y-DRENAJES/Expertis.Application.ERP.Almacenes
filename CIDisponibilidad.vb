@@ -1,3 +1,7 @@
+Imports Solmicro.Expertis.Business.ClasesTecozam
+Imports OfficeOpenXml
+Imports System.IO
+
 Public Class CIDisponibilidad
     Inherits Solmicro.Expertis.Engine.UI.CIMnto
 
@@ -374,16 +378,174 @@ Public Class CIDisponibilidad
 
 #End Region
 
-
+    Dim aux As New Business.ClasesTecozam.MetodosAuxiliares
     Private mblnStkDobleUnidad As Boolean
 
     Private Sub CIDisponibilidad_Load(ByVal sender As Object, ByVal e As System.EventArgs) Handles Me.Load
         InitFilterCriteria()
         LoadGridActions()
+        loadToolbarActions()
         If Not Me.DesignMode Then
             SettingDobleUnidad()
         End If
     End Sub
+
+    Private Sub loadToolbarActions()
+        Me.FormActions.Add("Inventario Almacenes con fecha.", AddressOf GeneraInventarioFecha)
+    End Sub
+
+    Public Sub GeneraInventarioFecha()
+        Dim mes As String
+        Dim anio As String
+        Dim familia As String
+        Dim Fecha1 As DateTime
+        Dim almacen As String
+
+        Dim frm As New frmFechas
+        frm.ShowDialog()
+
+        Fecha1 = frm.fecha1
+        familia = frm.familia
+        almacen = frm.almacen
+
+        mes = Fecha1.Month
+        anio = Fecha1.Year
+
+        Dim dtStockHoy As New DataTable
+        dtStockHoy = devuelveStockFechaHoy(familia, almacen)
+
+        Dim Fecha2 As String
+        'Fecha1 = "02/" & mes & "/" & anio
+
+        Fecha2 = "(SELECT MAX(FechaDocumento) FROM tbHistoricoMovimiento)"
+        Dim IDArticulo As String
+        Dim dtAux As New DataTable
+        Dim sql As String
+
+        'MsgBox(dtStockHoy.Rows.Count)
+        For Each dr As DataRow In dtStockHoy.Rows
+            IDArticulo = dr("IDArticulo")
+            sql = "select Sum(Cantidad) As Cantidad from tbHistoricoMovimiento where FechaDocumento>='" & Fecha1 & "'"
+            sql &= "and FechaDocumento<=" & Fecha2 & " and IDArticulo='" & IDArticulo & "' and IDAlmacen='" & almacen & "' and IDTipoMovimiento!=11"
+            dtAux = aux.EjecutarSqlSelect(sql)
+
+            Try
+                dr("StockFisico") = dr("StockFisico") - dtAux.Rows(0)("Cantidad")
+            Catch ex As Exception
+                dtAux.Rows(0)("Cantidad") = 0
+            End Try
+        Next
+
+        Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy)
+        'EXPORTO ESTA TABLA
+        'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
+        Dim ruta As String
+        ruta = DevuelveRuta()
+
+        GuardaExcel(ruta, familia, dtFinal, mes, anio)
+    End Sub
+    Public Function DevuelveTablaOrdenada(ByVal dtStockHoy As DataTable) As DataTable
+        Dim dt As New DataTable
+
+        Dim dc As New DataColumn("ALMACEN")
+        dt.Columns.Add(dc)
+        dc = New DataColumn("IDARTICULO")
+        dt.Columns.Add(dc)
+        dc = New DataColumn("ARTICULO")
+        dt.Columns.Add(dc)
+        dc = New DataColumn("CANTIDAD", System.Type.GetType("System.Double"))
+        dt.Columns.Add(dc)
+        dc = New DataColumn("PRECIO COMPRA(€)", System.Type.GetType("System.Double"))
+        dt.Columns.Add(dc)
+        dc = New DataColumn("UND")
+        dt.Columns.Add(dc)
+        dc = New DataColumn("TOTAL (€)", System.Type.GetType("System.Double"))
+        dt.Columns.Add(dc)
+
+        For Each dr As DataRow In dtStockHoy.Rows
+            Dim drFinal As DataRow
+            drFinal = dt.NewRow
+            drFinal("ALMACEN") = dr("IDAlmacen")
+            drFinal("IDARTICULO") = dr("IDArticulo")
+            drFinal("ARTICULO") = dr("DescArticulo")
+            drFinal("CANTIDAD") = dr("stockfisico")
+            drFinal("PRECIO COMPRA(€)") = dr("PrecioUltimaCompraA")
+            drFinal("UND") = dr("IDUdInterna")
+            drFinal("TOTAL (€)") = dr("stockfisico") * dr("PrecioUltimaCompraA")
+            dt.Rows.Add(drFinal)
+        Next
+
+        Return dt
+    End Function
+
+    Public Sub GuardaExcel(ByVal ruta As String, ByVal familia As String, ByVal dtFinal As DataTable, ByVal mes As String, ByVal anio As String)
+        Dim sumaTotal As Double = 0
+        For Each dr As DataRow In dtFinal.Rows
+            sumaTotal += dr("TOTAL (€)")
+        Next
+
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial
+
+        Using package As New ExcelPackage(ruta)
+            ' Crear una hoja de cálculo y obtener una referencia a ella.
+            Dim worksheet = package.Workbook.Worksheets.Add(mes & " " & familia & " " & mes & "" & anio.Substring(anio.Length - 2))
+
+            ' Copiar los datos de la DataTable a la hoja de cálculo.
+            worksheet.Cells("A1").LoadFromDataTable(dtFinal, True)
+
+            ' Establecer el valor "1" en la celda I2
+            worksheet.Cells("I2").Value = "TOTAL"
+            worksheet.Cells("J2").Value = sumaTotal
+
+            worksheet.Cells("J2").Style.Numberformat.Format = "#,##0.00€"
+            ' Establecer el formato de la columna E a partir de la fila 2
+            Dim columnaE As ExcelRange = worksheet.Cells("E2:E" & worksheet.Dimension.End.Row)
+            columnaE.Style.Numberformat.Format = "#,##0.00€"
+
+            ' Establecer el formato de la columna G a partir de la fila 2
+            Dim columnaG As ExcelRange = worksheet.Cells("G2:G" & worksheet.Dimension.End.Row)
+            columnaG.Style.Numberformat.Format = "#,##0.00€"
+
+            worksheet.Column(10).Width = 15
+
+            ' Aplicar formato negrita a la fila 1
+            Dim fila1 As ExcelRange = worksheet.Cells(1, 1, 1, worksheet.Dimension.End.Column)
+            fila1.Style.Font.Bold = True
+
+            ' Aplicar formato negrita a las celdas I2 y J2
+            Dim celdaI2 As ExcelRange = worksheet.Cells("I2")
+            Dim celdaJ2 As ExcelRange = worksheet.Cells("J2")
+            celdaI2.Style.Font.Bold = True
+            celdaJ2.Style.Font.Bold = True
+
+            ' Guardar el archivo de Excel.
+            package.Save()
+        End Using
+    End Sub
+    Public Function DevuelveRuta() As String
+        Dim CD As New SaveFileDialog()
+
+        CD.Title = "Seleccionar archivos"
+        CD.Filter = "Archivos Excel (*.xlsx)|*.xlsx"
+
+        'CD.ShowOpen()
+        CD.ShowDialog()
+
+        If CD.FileName <> "" Then
+            'lblRuta.Caption = CD.FileName
+            Return CD.FileName
+        End If
+    End Function
+    Public Function devuelveStockFechaHoy(ByVal familia As String, ByVal almacen As String) As DataTable
+        Dim dt As New DataTable
+        Dim filtro As New Solmicro.Expertis.Engine.Filter
+        filtro.Add("IDEstado", FilterOperator.NotEqual, "OBS")
+        filtro.Add("IDAlmacen", FilterOperator.Equal, almacen)
+        filtro.Add("IDFamilia", FilterOperator.Equal, familia)
+
+        dt = New BE.DataEngine().Filter("vCtlConsDisponibilidad", filtro)
+        Return dt
+    End Function
 
     Private Sub LoadGridActions()
         Me.Grid.Actions.Add("Abrir Disponibilidad Artículo", AddressOf AccionAbrirDisponibilidadArticulo)
