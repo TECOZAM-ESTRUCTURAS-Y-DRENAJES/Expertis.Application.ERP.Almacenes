@@ -1,6 +1,7 @@
 Imports Solmicro.Expertis.Business.ClasesTecozam
 Imports OfficeOpenXml
 Imports System.IO
+Imports Solmicro.Expertis.Engine
 
 Public Class CIDisponibilidad
     Inherits Solmicro.Expertis.Engine.UI.CIMnto
@@ -391,7 +392,7 @@ Public Class CIDisponibilidad
     End Sub
 
     Private Sub loadToolbarActions()
-        Me.FormActions.Add("Inventario Almacenes con fecha.", AddressOf GeneraInventarioFecha)
+        Me.FormActions.Add("Inventario Almacenes con fecha.", AddressOf GeneraInventarioFechaAC)
     End Sub
 
     Public Sub GeneraInventarioFecha()
@@ -436,7 +437,55 @@ Public Class CIDisponibilidad
             End Try
         Next
 
-        Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy)
+        'Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy)
+        'EXPORTO ESTA TABLA
+        'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
+        Dim ruta As String
+        ruta = DevuelveRuta()
+
+        'GuardaExcel(ruta, familia, dtFinal, mes, anio)
+    End Sub
+    Public Sub GeneraInventarioFechaAC()
+        Dim mes As String
+        Dim anio As String
+        Dim familia As String
+        Dim Fecha1 As DateTime
+        Dim almacen As String
+
+        Dim frm As New frmFechas
+        frm.ShowDialog()
+
+        Fecha1 = frm.fecha1
+        familia = frm.familia
+        almacen = frm.almacen
+
+        mes = Fecha1.Month
+        anio = Fecha1.Year
+
+        Dim dtStockHoy As New DataTable
+        dtStockHoy = devuelveStockFechaHoy(familia, almacen)
+
+        Dim Fecha2 As String
+        'Fecha1 = "02/" & mes & "/" & anio
+
+        Fecha2 = "(SELECT MAX(FechaMovimiento) FROM tbHistoricoMovimiento)"
+        Dim IDArticulo As String
+        Dim dtAux As New DataTable
+        Dim sql As String
+
+        For Each dr As DataRow In dtStockHoy.Rows
+            IDArticulo = dr("IDArticulo")
+            sql = "select Sum(Cantidad) As Cantidad from tbHistoricoMovimiento where FechaMovimiento>='" & Fecha1 & "'"
+            sql &= "and FechaMovimiento<=" & Fecha2 & " and IDArticulo='" & IDArticulo & "' and IDAlmacen='" & almacen & "' and IDTipoMovimiento!=11"
+            dtAux = aux.EjecutarSqlSelect(sql)
+            Try
+                dr("StockFisico") = dr("StockFisico") - dtAux.Rows(0)("Cantidad")
+            Catch ex As Exception
+                dtAux.Rows(0)("Cantidad") = 0
+            End Try
+        Next
+
+        Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy, Fecha1)
         'EXPORTO ESTA TABLA
         'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
         Dim ruta As String
@@ -444,7 +493,7 @@ Public Class CIDisponibilidad
 
         GuardaExcel(ruta, familia, dtFinal, mes, anio)
     End Sub
-    Public Function DevuelveTablaOrdenada(ByVal dtStockHoy As DataTable) As DataTable
+    Public Function DevuelveTablaOrdenada(ByVal dtStockHoy As DataTable, ByVal Fecha1 As String) As DataTable
         Dim dt As New DataTable
 
         Dim dc As New DataColumn("ALMACEN")
@@ -455,33 +504,81 @@ Public Class CIDisponibilidad
         dt.Columns.Add(dc)
         dc = New DataColumn("CANTIDAD", System.Type.GetType("System.Double"))
         dt.Columns.Add(dc)
-        dc = New DataColumn("PRECIO COMPRA(€)", System.Type.GetType("System.Double"))
+        dc = New DataColumn("PRECIO COMPRA", System.Type.GetType("System.Double"))
         dt.Columns.Add(dc)
         dc = New DataColumn("UND")
         dt.Columns.Add(dc)
-        dc = New DataColumn("TOTAL (€)", System.Type.GetType("System.Double"))
+        dc = New DataColumn("TOTAL", System.Type.GetType("System.Double"))
         dt.Columns.Add(dc)
 
         For Each dr As DataRow In dtStockHoy.Rows
-            Dim drFinal As DataRow
-            drFinal = dt.NewRow
-            drFinal("ALMACEN") = dr("IDAlmacen")
-            drFinal("IDARTICULO") = dr("IDArticulo")
-            drFinal("ARTICULO") = dr("DescArticulo")
-            drFinal("CANTIDAD") = dr("stockfisico")
-            drFinal("PRECIO COMPRA(€)") = dr("PrecioUltimaCompraA")
-            drFinal("UND") = dr("IDUdInterna")
-            drFinal("TOTAL (€)") = dr("stockfisico") * dr("PrecioUltimaCompraA")
-            dt.Rows.Add(drFinal)
+            If dr("IDArticulo") = "ABONOFERRET" Then
+            Else
+                Dim drFinal As DataRow
+                drFinal = dt.NewRow
+                drFinal("ALMACEN") = dr("IDAlmacen")
+                drFinal("IDARTICULO") = dr("IDArticulo")
+                drFinal("ARTICULO") = dr("DescArticulo")
+                drFinal("CANTIDAD") = dr("stockfisico")
+                'drFinal("PRECIO COMPRA") = dr("PrecioUltimaCompraA")
+                drFinal("PRECIO COMPRA") = CheckUltimoPrecio(dr("IDArticulo"), Fecha1)
+                drFinal("UND") = dr("IDUdInterna")
+                drFinal("TOTAL") = dr("stockfisico") * drFinal("PRECIO COMPRA")
+                dt.Rows.Add(drFinal)
+            End If 
         Next
 
         Return dt
     End Function
+    Public Function CheckUltimoPrecio(ByVal IDArticulo As String, ByVal Fecha1 As String) As Double
+        Dim f As New Filter
+        f.Add("IDMaterial", FilterOperator.Equal, IDArticulo)
+        f.Add("FechaEntrega", FilterOperator.LessThanOrEqual, Fecha1)
+        Dim dtObraMaterial As DataTable
+        dtObraMaterial = New BE.DataEngine().Filter("tbObraMaterial", f, , "FechaEntrega desc")
 
+
+        Dim filtro As New Filter
+        filtro.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+        Dim dtArticulo As DataTable
+        dtArticulo = New BE.DataEngine().Filter("tbMaestroArticulo", filtro)
+
+        If dtObraMaterial.Rows.Count <> 0 Then
+            'Si el articulo es de alquiler se pone el precio compra
+            If dtObraMaterial.Rows(0)("TipoFacturacion") = 3 Then
+                Return dtArticulo.Rows(0)("PrecioUltimaCompraA")
+            Else
+                'Tengo que comparar si el precio del ultimo material salido es menor que el ultimo comprado
+                Dim fechaAlq As Date
+                fechaAlq = dtObraMaterial.Rows(0)("FechaEntrega").ToString
+                Dim fechaUlCompra As Date
+                Try
+                    fechaUlCompra = dtArticulo.Rows(0)("FechaUltimaCompra").ToString
+                Catch ex As Exception
+                    fechaUlCompra = "31/12/2021"
+                End Try
+
+                '1º CHECK QUE FECHA ULTIMA COMPRA SEA MENO QUE FECHA 1
+                If fechaUlCompra > Fecha1 Then
+                    Return dtObraMaterial.Rows(0)("PrecioPrevMatA")
+                Else
+                    If fechaAlq < fechaUlCompra Then
+                        Return dtArticulo.Rows(0)("PrecioEstandarA")
+                    Else
+                        Return dtObraMaterial.Rows(0)("PrecioPrevMatA")
+                    End If
+                End If
+                
+            End If
+        Else
+            'Si no hay historial se pone PrecioEstandarA que es el que vino de Expertis4
+            Return dtArticulo.Rows(0)("PrecioEstandarA")
+        End If
+    End Function
     Public Sub GuardaExcel(ByVal ruta As String, ByVal familia As String, ByVal dtFinal As DataTable, ByVal mes As String, ByVal anio As String)
         Dim sumaTotal As Double = 0
         For Each dr As DataRow In dtFinal.Rows
-            sumaTotal += dr("TOTAL (€)")
+            sumaTotal += dr("TOTAL")
         Next
 
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial
@@ -500,7 +597,7 @@ Public Class CIDisponibilidad
             worksheet.Cells("J2").Style.Numberformat.Format = "#,##0.00€"
             ' Establecer el formato de la columna E a partir de la fila 2
             Dim columnaE As ExcelRange = worksheet.Cells("E2:E" & worksheet.Dimension.End.Row)
-            columnaE.Style.Numberformat.Format = "#,##0.00€"
+            'columnaE.Style.Numberformat.Format = "#,##0.00€"
 
             ' Establecer el formato de la columna G a partir de la fila 2
             Dim columnaG As ExcelRange = worksheet.Cells("G2:G" & worksheet.Dimension.End.Row)
