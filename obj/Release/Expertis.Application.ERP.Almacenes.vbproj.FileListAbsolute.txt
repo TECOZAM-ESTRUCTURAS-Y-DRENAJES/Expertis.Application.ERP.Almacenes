@@ -37,3 +37,6 @@ C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.A
 C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll.licenses
 C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.dll
 C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.Almacenes\obj\Release\Expertis.Application.ERP.Almacenes.pdb
+C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.CIHistoricoPrecios.resources
+C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.ModificarHistoricoPrecios.resources
+C:\Users\dvelasco\Desktop\FuentesExpertis\Application\Expertis.Application.ERP.Almacenes\obj\Release\Solmicro.Expertis.Application.ERP.Almacenes.frmFecha2.resources

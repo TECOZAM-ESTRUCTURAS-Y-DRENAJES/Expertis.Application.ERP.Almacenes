@@ -2,6 +2,8 @@ Imports Solmicro.Expertis.Business.ClasesTecozam
 Imports OfficeOpenXml
 Imports System.IO
 Imports Solmicro.Expertis.Engine
+Imports System.Collections.Generic
+Imports System.Xml
 
 Public Class CIDisponibilidad
     Inherits Solmicro.Expertis.Engine.UI.CIMnto
@@ -392,7 +394,578 @@ Public Class CIDisponibilidad
     End Sub
 
     Private Sub loadToolbarActions()
-        Me.FormActions.Add("Inventario Almacenes con fecha.", AddressOf GeneraInventarioFechaAC)
+        'Me.FormActions.Add("Inventario Almacenes con fecha.", AddressOf GeneraInventarioFechaAC)
+        'Me.AddSeparator()
+        Me.FormActions.Add("GENERAR INVENTARIO CON FECHA AL PASADO POR FAMILIA", AddressOf GeneraInventarioConFechaAlPasadoBueno)
+        Me.FormActions.Add("GENERAR INVENTARIO CON FECHA AL PASADO AGRUPADOS", AddressOf GeneraInventarioConFechaAlPasadoBuenoAgrupados)
+        Me.AddSeparator()
+        'Me.FormActions.Add("Generar precios de articulos entre dos fechas", AddressOf GenerarPrecioMedioEntreDosFechas)
+        'DVH 27/2/24
+        'Selecciono la ultima fecha del mes en el que estoy para generar los precios del mes siguiente
+        'Es decir, si quiero poner el precio de Febrero selecciono 31 de enero
+        Me.FormActions.Add("GENERAR PRECIOS MEDIOS PARA UN MES", AddressOf GenerarPrecioMedioParaUnMes)
+    End Sub
+    'David Velasco 26/2/24
+    'Este metodo calcula hardcodeando el precio medio para 2023. Deprecated por eso comentado
+    Public Sub GenerarPrecioMedioEntreDosFechas()
+        'Lo 1º es sacar la media de los precios de AC de 2001/2002/2003/3031/3033 entre 01/01/2023 y 31/12/2023. Esto será precio de Enero.
+        Dim tipo As String = "20"
+        Dim familia As String = "2002"
+        Dim f As New Filter
+        f.Add("FechaCreacionAudi", FilterOperator.LessThanOrEqual, "31/12/2023")
+        f.Add("IDTipo", FilterOperator.Equal, tipo)
+        f.Add("IDFamilia", FilterOperator.Equal, familia)
+        Dim dtArticulos As DataTable = New BE.DataEngine().Filter("tbMaestroArticulo", f)
+
+        Dim IDArticulo As String
+        Dim precioEstandarA As Double
+        Dim precioMedio As Double
+
+        Dim dtPreciosActualizados As New DataTable()
+        dtPreciosActualizados.Columns.Add("IDArticulo", GetType(String))
+        dtPreciosActualizados.Columns.Add("PrecioMedio", GetType(String))
+        dtPreciosActualizados.Columns.Add("Mes", GetType(String))
+        dtPreciosActualizados.Columns.Add("Año", GetType(String))
+
+        For Each dr As DataRow In dtArticulos.Rows
+            IDArticulo = dr("IDArticulo").ToString : precioEstandarA = dr("PrecioEstandarA")
+            precioMedio = calculaPrecioMedio(IDArticulo, precioEstandarA)
+
+            Dim newRow As DataRow = dtPreciosActualizados.NewRow()
+            newRow("IDArticulo") = IDArticulo
+            newRow("PrecioMedio") = precioMedio
+            newRow("Mes") = "1"
+            newRow("Año") = "2024"
+            dtPreciosActualizados.Rows.Add(newRow)
+        Next
+        'Exportar tabla de precios en excel formato Mes, Año, IDArticulo y Precio
+        'GeneraExcel(dtPreciosActualizados, familia)
+    End Sub
+
+    Public Sub GeneraExcel(ByVal dtPreciosActualizados As DataTable, ByVal mes As String, ByVal anio As String)
+
+        If mes = 12 Then
+            mes = 1
+            anio = anio + 1
+        Else
+            mes += 1
+        End If
+
+        Dim ruta As New FileInfo("V:\DAVIDVELASCO\PRECIOS " & mes & " " & anio & ".xlsx")
+        'Dim ruta As New FileInfo("N:\01. A3\" & mes & " A3 " & mes & anio.Substring(anio.Length - 2) & ".xlsx")
+        Dim rutaCadena As String = ""
+        rutaCadena = Ruta.FullName
+
+        'Verificar si el archivo existe.
+        If File.Exists(rutaCadena) Then
+            'Si el archivo existe, eliminarlo.
+            File.Delete(rutaCadena)
+        End If
+
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial
+
+        Using package As New ExcelPackage(Ruta)
+            ' Crear una hoja de cálculo y obtener una referencia a ella.
+            Dim worksheet = package.Workbook.Worksheets.Add("1")
+
+            ' Copiar los datos de la DataTable a la hoja de cálculo.
+            worksheet.Cells("A1").LoadFromDataTable(dtPreciosActualizados, True)
+
+            ' Aplicar formato negrita a la fila 1
+            Dim fila1 As ExcelRange = worksheet.Cells(1, 1, 1, worksheet.Dimension.End.Column)
+            fila1.Style.Font.Bold = True
+
+            ' Congelar la primera fila
+            worksheet.View.FreezePanes(2, 1)
+
+            ' Guardar el archivo de Excel.
+            package.Save()
+        End Using
+        MsgBox("Excel generado correctamente en DavidVelasco en Comun")
+    End Sub
+
+    Public Function calculaPrecioMedio(ByVal IDArticulo As String, ByVal precioEstandarA As Double) As Double
+        Dim f As New Filter
+        f.Add("FechaDocumento", FilterOperator.GreaterThanOrEqual, "01/01/2023")
+        f.Add("FechaDocumento", FilterOperator.LessThanOrEqual, "31/12/2023")
+        f.Add("IDTipoMovimiento", FilterOperator.Equal, 1)
+        f.Add("IDAlmacen", FilterOperator.Equal, "011")
+        f.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+        f.Add("PrecioA", FilterOperator.NotEqual, 0)
+
+        Dim dtMovimientos As DataTable = New BE.DataEngine().Filter("tbHistoricoMovimiento", f)
+
+        If dtMovimientos.Rows.Count = 0 Then
+            Return precioEstandarA
+        Else
+            Dim totalCantidad As Double = 0
+            Dim totalPonderado As Double = 0
+            For Each dr As DataRow In dtMovimientos.Rows
+                ' Obtener la cantidad y el precio de cada fila
+                Dim cantidad As Double = CDbl(dr("Cantidad"))
+                Dim precio As Double = CDbl(dr("PrecioA"))
+
+                ' Calcular el total de cantidad
+                totalCantidad += cantidad
+
+                ' Calcular el total ponderado sumando el precio ponderado de esta fila
+                totalPonderado += cantidad * precio
+            Next
+
+            Dim precioMedioPonderado As Double = totalPonderado / totalCantidad
+            Return precioMedioPonderado
+        End If
+
+    End Function
+    'David Velasco 26/2/24
+    'Este método selecciona una fecha(será siempre) 01/XX/YYYY para calcular el acumulado de los articulos a ese día, es decir el stock que habia ese dia
+    'Genera un fichero excel por familia, multiplicando el stock por el precio que había en ese día
+    'Sirve para sacar informe valorado de almacenes con fecha al pasado.
+    Public Sub GeneraInventarioConFechaAlPasadoBueno()
+        Dim respuesta As MsgBoxResult
+        respuesta = MsgBox("Este metodo solo funciona desde Enero del 24 en adelante. Seleccione la fecha: 01/MM/YYYY, aunque se puede hacer para cualquier fecha. ¿Desea continuar?", MsgBoxStyle.YesNo, "Advertencia")
+
+        If respuesta = MsgBoxResult.No Then
+            Exit Sub
+        End If
+        Dim mes As String : Dim anio As String : Dim familia As String : Dim Fecha1 As DateTime : Dim almacen As String
+
+        Dim frm As New frmFechas
+        frm.ShowDialog()
+
+        'Tengo que coger la fecha del dia 01/MM/YYYY
+        Fecha1 = frm.fecha1 : familia = frm.familia : almacen = frm.almacen
+        mes = Fecha1.Month : anio = Fecha1.Year
+
+        Dim f As New Filter
+        f.Add("FechaCreacionAudi", FilterOperator.LessThanOrEqual, Fecha1)
+        f.Add("IDFamilia", FilterOperator.Equal, familia)
+        Dim dtArticulos As DataTable = New BE.DataEngine().Filter("tbMaestroArticulo", f)
+        Dim IDArticulo As String
+        Dim dtAux As DataTable
+
+        Dim dtFinal As New DataTable
+        Dim dc As New DataColumn("ALMACEN")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("IDARTICULO")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("ARTICULO")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("CANTIDAD", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("PRECIO COMPRA", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("UND")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("TOTAL", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+
+        For Each dr As DataRow In dtArticulos.Rows
+            IDArticulo = dr("IDArticulo").ToString
+            Dim filtro As New Filter
+            filtro.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+            filtro.Add("FechaDocumento", FilterOperator.LessThanOrEqual, Fecha1)
+            filtro.Add("IDAlmacen", FilterOperator.Equal, "011")
+
+            dtAux = New BE.DataEngine().Filter("tbHistoricoMovimiento", filtro, , "FechaDocumento desc, IDLineaMovimiento desc")
+
+            Dim drFinal As DataRow
+            drFinal = dtFinal.NewRow
+            drFinal("ALMACEN") = "011"
+            drFinal("IDARTICULO") = IDArticulo
+            drFinal("ARTICULO") = devuelveDescArticulo(IDArticulo)
+            If dtAux.Rows.Count = 0 Then
+                Dim fil As New Filter
+                Dim dt As New DataTable
+                fil.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+                fil.Add("IDAlmacen", FilterOperator.Equal, "011")
+                dt = New BE.DataEngine().Filter("tbMaestroArticuloAlmacen", fil)
+
+                drFinal("CANTIDAD") = dt.Rows(0)("StockFisico")
+            Else
+                drFinal("CANTIDAD") = dtAux.Rows(0)("Acumulado")
+            End If
+
+            drFinal("PRECIO COMPRA") = devuelvePrecioArticuloMesAño(IDArticulo, mes, anio)
+            drFinal("UND") = devuelveUnidad(IDArticulo)
+            drFinal("TOTAL") = drFinal("CANTIDAD") * drFinal("PRECIO COMPRA")
+            dtFinal.Rows.Add(drFinal)
+        Next
+
+
+        'EXPORTO ESTA TABLA
+        'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
+        Dim ruta As String
+        ruta = DevuelveRuta()
+
+        GuardaExcel(ruta, familia, dtFinal, mes, anio)
+    End Sub
+
+    Dim familias() As String = {"2001", "2002", "2003", "3031", "3033"}
+
+    'DAVID VELASCO 28/2/24
+    'ESTE METODO TE SACA EL INFORME DEL ALMACEN VALORADO PARA LAS FAMILIAS: 2001/2002/2003/3031/3033 DE UNA SOLA VEZ
+    Public Sub GeneraInventarioConFechaAlPasadoBuenoAgrupados()
+        Dim respuesta As MsgBoxResult
+        respuesta = MsgBox("Este metodo solo funciona desde Enero del 24 en adelante. Seleccione la fecha: 01/MM/YYYY, aunque se puede hacer para cualquier fecha. ¿Desea continuar?", MsgBoxStyle.YesNo, "Advertencia")
+
+        If respuesta = MsgBoxResult.No Then
+            Exit Sub
+        End If
+        Dim mes As String : Dim anio As String : Dim familia As String : Dim Fecha1 As DateTime : Dim almacen As String
+
+        Dim frm As New frmFechas
+        frm.Label4.Visible = False
+        frm.txtFamilia.Visible = False
+
+        frm.ShowDialog()
+
+        'Tengo que coger la fecha del dia 01/MM/YYYY
+        Fecha1 = frm.fecha1 : familia = frm.familia : almacen = frm.almacen
+        mes = Fecha1.Month : anio = Fecha1.Year
+
+        Dim dtFinal As New DataTable
+        Dim dc As New DataColumn("ALMACEN")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("IDARTICULO")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("ARTICULO")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("CANTIDAD", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("PRECIO COMPRA", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("UND")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("TOTAL", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("FAMILIA")
+        dtFinal.Columns.Add(dc)
+
+
+
+        For Each familiaItem As String In familias
+            Dim f As New Filter
+            f.Add("FechaCreacionAudi", FilterOperator.LessThanOrEqual, Fecha1)
+            f.Add("IDFamilia", FilterOperator.Equal, familiaItem)
+            Dim dtArticulos As DataTable = New BE.DataEngine().Filter("tbMaestroArticulo", f)
+            Dim IDArticulo As String
+            Dim dtAux As DataTable
+
+            
+            For Each dr As DataRow In dtArticulos.Rows
+                IDArticulo = dr("IDArticulo").ToString
+                Dim filtro As New Filter
+                filtro.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+                filtro.Add("FechaDocumento", FilterOperator.LessThanOrEqual, Fecha1)
+                filtro.Add("IDAlmacen", FilterOperator.Equal, "011")
+
+                dtAux = New BE.DataEngine().Filter("tbHistoricoMovimiento", filtro, , "FechaDocumento desc, IDLineaMovimiento desc")
+
+                Dim drFinal As DataRow
+                drFinal = dtFinal.NewRow
+                drFinal("FAMILIA") = familiaItem ' Agregar el valor de la familia a la columna correspondiente
+                drFinal("ALMACEN") = "011"
+                drFinal("IDARTICULO") = IDArticulo
+                drFinal("ARTICULO") = devuelveDescArticulo(IDArticulo)
+                If dtAux.Rows.Count = 0 Then
+                    Dim fil As New Filter
+                    Dim dt As New DataTable
+                    fil.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+                    fil.Add("IDAlmacen", FilterOperator.Equal, "011")
+                    dt = New BE.DataEngine().Filter("tbMaestroArticuloAlmacen", fil)
+
+                    drFinal("CANTIDAD") = dt.Rows(0)("StockFisico")
+                Else
+                    drFinal("CANTIDAD") = dtAux.Rows(0)("Acumulado")
+                End If
+
+                drFinal("PRECIO COMPRA") = devuelvePrecioArticuloMesAño(IDArticulo, mes, anio)
+                drFinal("UND") = devuelveUnidad(IDArticulo)
+                drFinal("TOTAL") = drFinal("CANTIDAD") * drFinal("PRECIO COMPRA")
+                dtFinal.Rows.Add(drFinal)
+            Next
+
+        Next
+
+
+        'EXPORTO ESTA TABLA
+        'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
+        Dim ruta As String
+        ruta = DevuelveRuta()
+
+        GuardaExcelAgrupado(ruta, dtFinal, mes, anio)
+    End Sub
+    Public Function devuelveDescArticulo(ByVal IDArticulo As String) As String
+        Dim f As New Filter
+        f.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+        Dim dt As DataTable = New BE.DataEngine().Filter("tbMaestroArticulo", f)
+
+        Return dt.Rows(0)("DescArticulo")
+    End Function
+
+    Public Function devuelveUnidad(ByVal IDArticulo As String) As String
+        Dim f As New Filter
+        f.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+        Dim dt As DataTable = New BE.DataEngine().Filter("tbMaestroArticulo", f)
+
+        Return dt.Rows(0)("IDUdInterna")
+    End Function
+
+    'David Velasco 26/2/24
+    'Este metodo va a calcular el precio medio del siguiente mes para articulos que saca Raquel + 3031 + 3033
+    'El objetivo es dejar este precio durante todo el mes siguiente y hacer este método el 1 de cada mes.
+    Public Sub GenerarPrecioMedioParaUnMes()
+        '1º. Selecciona la fecha hasta la que va a tener en cuenta los albaranes para sacar los precios. Ultimo día de un mes.
+        'Por ejemplo para sacar el coste de marzo se pondría 29/02/24 y actualizaría el precio con el stock + albaranes compra de ese dia
+        Dim respuesta As MsgBoxResult
+        respuesta = MsgBox("Este metodo genera el precio medio de los articulos del proximo mes. Seleccione la fecha 31/MM/YYYY. Si quieres calcular los precios de febrero del 24 selecciona el día 31/01/2024 ¿Desea continuar?", MsgBoxStyle.YesNo, "Advertencia")
+        If respuesta = MsgBoxResult.No Then
+            Exit Sub
+        End If
+
+        Dim mes As String : Dim Fecha1 As DateTime : Dim Fecha2 As DateTime : Dim anio As String
+        Dim frm As New frmFecha2 : frm.ShowDialog()
+
+        'Tengo que coger la fecha del dia 31/MM/YYYY
+        Fecha2 = frm.fecha2
+        mes = Fecha2.Month
+        anio = Fecha2.Year
+        Fecha1 = "01/" & mes & "/" & anio
+
+        ' Devuelve los articulos que se han comprado(ALB COMPRA) entre esas fechas para calcular los precios medios
+        Dim dtArticulosAlbaranesCompra As DataTable = devuelveAlbaranes(Fecha1, Fecha2)
+
+        ' Devuelve los artículos que se han creado antes de la fecha2
+        ' Y por lo tanto son de los que voy a tener que calcular el precio medio
+        Dim dtArticulos As DataTable = devuelveArticulosACalcularPrecioMedio(Fecha2)
+
+        ' Recorro dtArticulos y busco en tbHistoricoPreciosArticulos para sacar el precio del mes anterior y
+        ' saco la cantidad que había el día 1 de ese mes
+        Dim dtArticulosPrecioMesAnterior As DataTable = devuelveArticulosPrecioMesAnterior(mes, anio)
+        ' Si ha tenido movimientos, hago media ponderada
+        ' Si no pongo el precio del mes de enero
+        ' Y sino no tiene movimientos y no tiene precio el mes anterior, le pongo el PrecioEstandarA
+        ' PD: Hacerlo para la fecha 31/01/2024
+        Dim dtArticulosPreciosFinales As DataTable = calculaPrecioMedio(dtArticulos, dtArticulosAlbaranesCompra, dtArticulosPrecioMesAnterior, mes, anio)
+        'Genero excel para luego actualizar precios del mes x desde la ventana CIHistoricoPrecios
+        GeneraExcel(dtArticulosPreciosFinales, mes, anio)
+        'Queda pendiente el actualizar los precios para el mes de marzo con los precios de febrero el día 26/2
+    End Sub
+    Public Function devuelveArticulosPrecioMesAnterior(ByVal mes As String, ByVal anio As String) As DataTable
+        Dim f As New Filter
+        f.Add("Mes", FilterOperator.Equal, mes)
+        f.Add("Año", FilterOperator.Equal, anio)
+
+        Dim dt As DataTable = New BE.DataEngine().Filter("tbHistoricoPreciosArticulos", f)
+
+        Return dt
+    End Function
+
+    Public Function calculaPrecioMedio(ByVal dtArticulos As DataTable, ByVal dtArticulosAlbaranesCompra As DataTable, ByVal dtArticulosPrecioMesAnterior As DataTable, ByVal mes As String, ByVal anio As String) As DataTable
+        Dim mesExcel As String
+        Dim anioExcel As String
+        If mes = 12 Then
+            mesExcel = 1
+            anioExcel = anio + 1
+        Else
+            mesExcel = mes + 1
+            anioExcel = anio
+        End If
+        '--------FORMATO TABLA
+        Dim dtFinal As New DataTable
+        Dim dc As New DataColumn("IDArticulo")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("PrecioMedio", System.Type.GetType("System.Double"))
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("Mes")
+        dtFinal.Columns.Add(dc)
+        dc = New DataColumn("Año")
+        dtFinal.Columns.Add(dc)
+
+        '-------FIN FORMATO TABLA
+        Dim Fecha1 As DateTime : Fecha1 = "01/" & mes & "/" & anio
+        Dim cantidaddia1 As Double
+        Dim preciodia1 As Double
+        Dim productodia1 As Double
+        Dim cantidadAlbaran As Double = 0
+
+        Dim totalCantidadesAlbaranes As Double = 0
+        'Cantidad x precio
+        Dim productotemp As Double = 0
+        Dim productoAlbaranes As Double = 0
+
+        Dim numeradorMediaPonderada As Double = 0
+        Dim denominadorMediaPonderada As Double = 0
+        Dim mediaPonderada As Double = 0
+        'Recorro la lista de artículos de los cuales voy a calcular precio medio
+        For Each fila As DataRow In dtArticulos.Rows
+            'Saco la cantidad que habia el día 01 de ese mes
+            cantidaddia1 = devuelveAcumulado(Fecha1, fila("IDArticulo"))
+            'Saco el precio que había el día 01 de ese mes. Si no tiene precio, le pongo PrecioEstandarA
+            preciodia1 = devuelvePrecioDia1(fila("IDArticulo"), dtArticulosPrecioMesAnterior)
+            'Calculo el producto para hacer media ponderada
+            productodia1 = cantidaddia1 * preciodia1
+
+            'Compruebo en los albaranes de compra si hay algun movimiento para hacer media ponderada de precio.
+            'Filtro dtArticulosAlbaranesCompra por el campo IDArticulo
+            Dim albaranesFiltrados() As DataRow = dtArticulosAlbaranesCompra.Select("IDArticulo = '" & fila("IDArticulo") & "'")
+
+            If albaranesFiltrados.Length > 0 Then
+                productoAlbaranes = 0
+                totalCantidadesAlbaranes = 0
+                'Iterar sobre los registros filtrados
+                For Each albaran As DataRow In albaranesFiltrados
+                    'If albaran("IDArticulo") = "15F63034" Then
+                    'MsgBox("15F63034")
+                    'End If
+                    totalCantidadesAlbaranes = totalCantidadesAlbaranes + albaran("Cantidad")
+                    productotemp = albaran("PrecioA") * albaran("Cantidad")
+                    productoAlbaranes = productoAlbaranes + productotemp
+                Next
+                numeradorMediaPonderada = productodia1 + productoAlbaranes
+                denominadorMediaPonderada = cantidaddia1 + totalCantidadesAlbaranes
+                mediaPonderada = numeradorMediaPonderada / denominadorMediaPonderada
+
+                numeradorMediaPonderada = 0 : denominadorMediaPonderada = 0
+            Else
+                mediaPonderada = preciodia1
+            End If
+
+            Dim drFinal As DataRow
+            drFinal = dtFinal.NewRow
+            drFinal("IDArticulo") = fila("IDArticulo")
+            drFinal("PrecioMedio") = mediaPonderada
+            drFinal("Mes") = mesExcel
+            drFinal("Año") = anioExcel
+            dtFinal.Rows.Add(drFinal)
+            'Le paso 0 para que no de error luego
+            mediaPonderada = 0
+        Next
+
+        Return dtFinal
+    End Function
+    Public Function devuelvePrecioDia1(ByVal IDArticulo As String, ByVal dtArticulosPrecioMesAnterior As DataTable) As Double
+        Dim precio As Double = 0
+        'Recorro la tabla y si existe el IDArticulo devuelve precio que ha estado para todo el mes
+        For Each dr As DataRow In dtArticulosPrecioMesAnterior.Rows
+            If dr("IDArticulo") = IDArticulo Then
+                precio = dr("PrecioMedio")
+                Exit For
+            End If
+        Next
+
+        'Si no existe precio para el dia1 devuelvo el precioEstandarA o precioUltimaCompra si es electroportatil(2003)
+        If precio <> 0 Then
+            Return precio
+        Else
+            Dim f As New Filter
+            f.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+            Dim dt As DataTable = New BE.DataEngine().Filter("tbMaestroArticulo", f)
+            If dt.Rows(0)("IDFamilia") = "2003" Then
+                Return dt.Rows(0)("PrecioUltimaCompraA")
+            Else
+                Return dt.Rows(0)("PrecioEstandarA")
+            End If
+        End If
+    End Function
+
+    Public Function devuelveAcumulado(ByVal Fecha1 As String, ByVal IDArticulo As String) As Double
+        Dim dtArticulos As New DataTable
+        Dim sql As String = "select TOP 1 IDArticulo, Cantidad, Acumulado, PrecioA from tbHistoricoMovimiento" _
+        & " where FechaDocumento < '" & Fecha1 & "'" _
+        & " and IDArticulo='" & IDArticulo & "' " _
+        & " and IDAlmacen='011' ORDER BY FechaDocumento desc"
+        dtArticulos = aux.EjecutarSqlSelect(sql)
+
+        'Si no hay acumulado me vas a devolver el stock actual
+        If dtArticulos.Rows.Count > 0 Then
+            ' Lo devuelvo en valor absoluto por si acaso hubiera algún negativo para evitar errores
+            Return Math.Abs(dtArticulos.Rows(0)("Acumulado"))
+        Else
+            Return 0
+        End If
+
+    End Function
+    Public Function devuelveAlbaranes(ByVal Fecha1 As String, ByVal Fecha2 As String) As DataTable
+        Dim dtArticulos As New DataTable
+        Dim sql As String = "select IDArticulo,DescArticulo, Cantidad, Acumulado, PrecioA  from vFrmCIMovimientos" _
+        & " where FechaDocumento >= '" & Fecha1 & "' and FechaDocumento <='" & Fecha2 & "'" _
+        & " and (IDFamilia='2001' or IDFamilia='2002' or IDFamilia='2003' or IDFamilia='3031' or IDFamilia='3033')" _
+        & " and IDAlmacen='011'" _
+        & " and CodTipoMovimiento='E5'"
+        dtArticulos = aux.EjecutarSqlSelect(sql)
+        Return dtArticulos
+    End Function
+    Public Function devuelveArticulosACalcularPrecioMedio(ByVal Fecha2 As String) As DataTable
+        Dim dtArticulos As New DataTable
+        Dim sql As String = "select IDArticulo, DescArticulo, IDTipo, IDFamilia, PrecioEstandarA, PrecioUltimaCompraA from xtecozam50R2..tbMaestroArticulo" _
+        & " where FechaCreacionAudi<='" & Fecha2 & "'" _
+        & " and (IDFamilia='2001' or IDFamilia='2002' or IDFamilia='2003' or IDFamilia='3031' or IDFamilia='3033')"
+
+        dtArticulos = aux.EjecutarSqlSelect(sql)
+        Return dtArticulos
+    End Function
+
+    Public Sub GeneraInventarioConFechaAlPasado()
+        Dim respuesta As MsgBoxResult
+        respuesta = MsgBox("Este metodo solo funciona desde Enero del 24 en adelante. Seleccione la fecha 01/MM/YYYY. ¿Desea continuar?", MsgBoxStyle.YesNo, "Advertencia")
+
+        If respuesta = MsgBoxResult.No Then
+            Exit Sub
+        End If
+        Dim mes As String
+        Dim anio As String
+        Dim familia As String
+        Dim Fecha1 As DateTime
+        Dim almacen As String
+
+        Dim frm As New frmFechas
+        frm.ShowDialog()
+
+        'Tengo que coger la fecha del dia 01/MM/YYYY
+        Fecha1 = frm.fecha1
+        familia = frm.familia
+        almacen = frm.almacen
+
+        mes = Fecha1.Month
+        anio = Fecha1.Year
+
+        Dim dtStockHoy As New DataTable
+        dtStockHoy = devuelveStockFechaHoy(familia, almacen)
+
+        Dim Fecha2 As String
+
+        'Saco la fecha de hoy, donde se haya hecho el ultimo movimiento.
+        Fecha2 = "(SELECT MAX(FechaMovimiento) FROM tbHistoricoMovimiento)"
+        Dim IDArticulo As String
+        Dim dtAux As New DataTable
+        Dim sql As String
+
+
+        For Each dr As DataRow In dtStockHoy.Rows
+            IDArticulo = dr("IDArticulo")
+            sql = "select Sum(Cantidad) As Cantidad from tbHistoricoMovimiento where FechaDocumento>='" & Fecha1 & "'"
+            sql &= "and FechaDocumento<=" & Fecha2 & " and IDArticulo='" & IDArticulo & "' and IDAlmacen='" & almacen & "' and IDTipoMovimiento!=11"
+            dtAux = aux.EjecutarSqlSelect(sql)
+            Try
+                If dtAux.Rows(0)("Cantidad") >= 0 Then
+                    dr("StockFisico") = dr("StockFisico") - (dtAux.Rows(0)("Cantidad"))
+                Else
+                    dr("StockFisico") = dr("StockFisico") + Math.Abs(dtAux.Rows(0)("Cantidad"))
+                End If
+            Catch ex As Exception
+                dtAux.Rows(0)("Cantidad") = 0
+            End Try
+        Next
+
+        Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy, Fecha1, mes, anio)
+        'EXPORTO ESTA TABLA
+        'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
+        Dim ruta As String
+        ruta = DevuelveRuta()
+
+        GuardaExcel(ruta, familia, dtFinal, mes, anio)
     End Sub
 
     Public Sub GeneraInventarioFecha()
@@ -445,6 +1018,7 @@ Public Class CIDisponibilidad
 
         'GuardaExcel(ruta, familia, dtFinal, mes, anio)
     End Sub
+
     Public Sub GeneraInventarioFechaAC()
         Dim mes As String
         Dim anio As String
@@ -485,7 +1059,7 @@ Public Class CIDisponibilidad
             End Try
         Next
 
-        Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy, Fecha1)
+        Dim dtFinal As DataTable = DevuelveTablaOrdenada(dtStockHoy, Fecha1, mes, anio)
         'EXPORTO ESTA TABLA
         'CAMPOS: IDALMACEN-IDARTICULO-DESCARTICULO-STOCKFISICO-PRECIOULTIMACOMPRAA-IDUDINTERNA-TOTAL(€) [Calculado]
         Dim ruta As String
@@ -493,7 +1067,8 @@ Public Class CIDisponibilidad
 
         GuardaExcel(ruta, familia, dtFinal, mes, anio)
     End Sub
-    Public Function DevuelveTablaOrdenada(ByVal dtStockHoy As DataTable, ByVal Fecha1 As String) As DataTable
+
+    Public Function DevuelveTablaOrdenada(ByVal dtStockHoy As DataTable, ByVal Fecha1 As String, ByVal mes As String, ByVal anio As String) As DataTable
         Dim dt As New DataTable
 
         Dim dc As New DataColumn("ALMACEN")
@@ -512,7 +1087,7 @@ Public Class CIDisponibilidad
         dt.Columns.Add(dc)
 
         For Each dr As DataRow In dtStockHoy.Rows
-            If dr("IDArticulo") = "ABONOFERRET" Then
+            If dr("IDArticulo") = "ABONOFERRET" Or dr("IDArticulo") = "ABONOMADERA" Then
             Else
                 Dim drFinal As DataRow
                 drFinal = dt.NewRow
@@ -521,14 +1096,24 @@ Public Class CIDisponibilidad
                 drFinal("ARTICULO") = dr("DescArticulo")
                 drFinal("CANTIDAD") = dr("stockfisico")
                 'drFinal("PRECIO COMPRA") = dr("PrecioUltimaCompraA")
-                drFinal("PRECIO COMPRA") = CheckUltimoPrecio(dr("IDArticulo"), Fecha1)
+                'drFinal("PRECIO COMPRA") = CheckUltimoPrecio(dr("IDArticulo"), Fecha1)
+                drFinal("PRECIO COMPRA") = devuelvePrecioArticuloMesAño(dr("IDArticulo"), mes, anio)
                 drFinal("UND") = dr("IDUdInterna")
                 drFinal("TOTAL") = dr("stockfisico") * drFinal("PRECIO COMPRA")
                 dt.Rows.Add(drFinal)
-            End If 
+            End If
         Next
 
         Return dt
+    End Function
+    Public Function devuelvePrecioArticuloMesAño(ByVal IDArticulo As String, ByVal mes As String, ByVal anio As String) As Double
+        Dim dt As New DataTable
+        Dim f As New Filter
+        f.Add("IDArticulo", FilterOperator.Equal, IDArticulo)
+        f.Add("Mes", FilterOperator.Equal, mes)
+        f.Add("Año", FilterOperator.Equal, anio)
+        dt = New BE.DataEngine().Filter("tbHistoricoPreciosArticulos", f)
+        Return dt.Rows(0)("PrecioMedio")
     End Function
     Public Function CheckUltimoPrecio(ByVal IDArticulo As String, ByVal Fecha1 As String) As Double
         Dim f As New Filter
@@ -568,13 +1153,14 @@ Public Class CIDisponibilidad
                         Return dtObraMaterial.Rows(0)("PrecioPrevMatA")
                     End If
                 End If
-                
+
             End If
         Else
             'Si no hay historial se pone PrecioEstandarA que es el que vino de Expertis4
             Return dtArticulo.Rows(0)("PrecioEstandarA")
         End If
     End Function
+
     Public Sub GuardaExcel(ByVal ruta As String, ByVal familia As String, ByVal dtFinal As DataTable, ByVal mes As String, ByVal anio As String)
         Dim sumaTotal As Double = 0
         For Each dr As DataRow In dtFinal.Rows
@@ -619,6 +1205,54 @@ Public Class CIDisponibilidad
             package.Save()
         End Using
     End Sub
+
+    Public Sub GuardaExcelAgrupado(ByVal ruta As String, ByVal dtFinal As DataTable, ByVal mes As String, ByVal anio As String)
+        ExcelPackage.LicenseContext = LicenseContext.NonCommercial
+
+        Using package As New ExcelPackage(ruta)
+            For Each familia As String In familias
+                Dim sumaTotal As Double = 0
+                Dim dv As New DataView(dtFinal)
+                dv.RowFilter = "FAMILIA = '" & familia & "'"
+                ' Crear un nuevo DataTable basado en el resultado del filtro de la familia
+                Dim dtFamilia As DataTable = dv.ToTable()
+
+                Dim worksheet = package.Workbook.Worksheets.Add(familia)
+
+                worksheet.Cells("A1").LoadFromDataTable(dtFamilia, True)
+
+                For Each dr As DataRow In dtFamilia.Rows
+                    sumaTotal += Convert.ToDouble(dr("TOTAL"))
+                Next
+
+                worksheet.Cells("I2").Value = "TOTAL"
+                worksheet.Cells("J2").Value = sumaTotal
+                worksheet.Cells("J2").Style.Numberformat.Format = "#,##0.00€"
+
+                Dim columnaE As ExcelRange = worksheet.Cells("E2:E" & worksheet.Dimension.End.Row)
+                columnaE.Style.Numberformat.Format = "#,##0.00€"
+
+                Dim columnaG As ExcelRange = worksheet.Cells("G2:G" & worksheet.Dimension.End.Row)
+                columnaG.Style.Numberformat.Format = "#,##0.00€"
+
+                worksheet.Column(7).Width = 15
+                worksheet.Column(10).Width = 15
+
+                Dim fila1 As ExcelRange = worksheet.Cells(1, 1, 1, worksheet.Dimension.End.Column)
+                fila1.Style.Font.Bold = True
+
+                Dim celdaI2 As ExcelRange = worksheet.Cells("I2")
+                Dim celdaJ2 As ExcelRange = worksheet.Cells("J2")
+                celdaI2.Style.Font.Bold = True
+                celdaJ2.Style.Font.Bold = True
+                worksheet.View.FreezePanes(2, 1) ' Esto inmovilizará la fila 1 y la columna A
+
+            Next
+
+            package.Save()
+        End Using
+    End Sub
+
     Public Function DevuelveRuta() As String
         Dim CD As New SaveFileDialog()
 
@@ -633,6 +1267,7 @@ Public Class CIDisponibilidad
             Return CD.FileName
         End If
     End Function
+
     Public Function devuelveStockFechaHoy(ByVal familia As String, ByVal almacen As String) As DataTable
         Dim dt As New DataTable
         Dim filtro As New Solmicro.Expertis.Engine.Filter

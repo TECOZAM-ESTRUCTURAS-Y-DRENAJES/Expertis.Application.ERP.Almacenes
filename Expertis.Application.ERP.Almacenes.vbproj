@@ -211,6 +211,12 @@
     <Compile Include="frmDisponible.vb">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="frmFecha2.Designer.vb">
+      <DependentUpon>frmFecha2.vb</DependentUpon>
+    </Compile>
+    <Compile Include="frmFecha2.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="frmFechas.Designer.vb">
       <DependentUpon>frmFechas.vb</DependentUpon>
     </Compile>
@@ -233,6 +239,18 @@
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="My Project\AssemblyInfo.vb" />
+    <Compile Include="PreciosArticulos\CIHistoricoPrecios.Designer.vb">
+      <DependentUpon>CIHistoricoPrecios.vb</DependentUpon>
+    </Compile>
+    <Compile Include="PreciosArticulos\CIHistoricoPrecios.vb">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="PreciosArticulos\ModificarHistoricoPrecios.Designer.vb">
+      <DependentUpon>ModificarHistoricoPrecios.vb</DependentUpon>
+    </Compile>
+    <Compile Include="PreciosArticulos\ModificarHistoricoPrecios.vb">
+      <SubType>Form</SubType>
+    </Compile>
     <EmbeddedResource Include="CIActAlmacenPredet.resx">
       <DependentUpon>CIActAlmacenPredet.vb</DependentUpon>
       <SubType>Designer</SubType>
@@ -243,6 +261,10 @@
     </EmbeddedResource>
     <EmbeddedResource Include="frmDisponible.resx">
       <DependentUpon>frmDisponible.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="frmFecha2.resx">
+      <DependentUpon>frmFecha2.vb</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
     <EmbeddedResource Include="frmFechas.resx">
@@ -264,6 +286,14 @@
     </EmbeddedResource>
     <EmbeddedResource Include="MntoAlmacenesExpertis4.resx">
       <DependentUpon>MntoAlmacenesExpertis4.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PreciosArticulos\CIHistoricoPrecios.resx">
+      <DependentUpon>CIHistoricoPrecios.vb</DependentUpon>
+      <SubType>Designer</SubType>
+    </EmbeddedResource>
+    <EmbeddedResource Include="PreciosArticulos\ModificarHistoricoPrecios.resx">
+      <DependentUpon>ModificarHistoricoPrecios.vb</DependentUpon>
       <SubType>Designer</SubType>
     </EmbeddedResource>
   </ItemGroup>
